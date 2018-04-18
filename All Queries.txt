@@ -1,0 +1,4 @@
+create table loginData (id integer primary key , name text , password varchar , nickname text , role text , zomatoid number , tablecount number);
+insert into loginData (name, password, nickname,role , zomatoid ,tablecount ) values("admin" , "admin" , "admin", "admin" , 18647056 , 20);
+insert into loginData (name, password, nickname,role , zomatoid, tablecount) values("chaskaAdda" , "chaskaAdda" , "chaskaAdda", "Manager" , 18647056,20);
+create table chaskaAddaStocks (id integer primary key , itemname text , qtyPresent real , minQty real , maxQty real, orderedQty real, unit text);

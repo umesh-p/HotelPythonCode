@@ -10,7 +10,7 @@ from pandas.io.json import json_normalize
 from datetime import datetime
 import requests
 import sqlite3
-
+import copy
 
 import os
 
@@ -33,7 +33,7 @@ def selectData(tableName):
     data = [dict(zip(columns, row)) for row in dataRows]
     return data;
     
-    
+
 def insertData(tableName, columnNames , Values ):
     
      query = "INSERT into "+tableName+" "+str(columnNames)+" values "+str(Values);
@@ -55,14 +55,14 @@ def updateData(tableName, columnNames, Values):
     conn.commit()  
     return 'success'
 
-def deleteData(tableName ,id):
+def deleteData(tableName, param ,id):
     
-    query = "DELETE from "+str(tableName)+" where id = "+str(id);
-    print(query)
+    query = "DELETE from "+str(tableName)+" where "+param+" = "+str(id);
     conn.execute(query)    
     conn.commit()  
     return 'success'
    
+
 #========================================================================================================    
    
 @app.route('/login', methods=['GET', 'POST'])
@@ -89,7 +89,7 @@ def inventory():
     table = userName+'Stocks'
 
     if request.method == 'GET':
-        data =  selectData(table)        
+        data =  selectData(table)         
         return jsonify({'success':True , 'data':data })    
     
     if request.method == 'POST':
@@ -108,33 +108,84 @@ def inventory():
     
     if request.method == 'DELETE':
         recordId = request.headers['recordId'];
-        deleteData(table,recordId)
+        deleteData(table,'id',recordId)
         return jsonify({'success':True , 'data' : 'success' })
     
+@app.route('/menu', methods=['GET', 'POST' , 'PUT' , 'DELETE'])
+def menu():
+    
+    userName = request.headers['userName']
+    table = userName+'Menu'
+    materialTable = userName+'MenuMaterial'
 
+    if request.method == 'GET':
+        data =  selectData(table)
+        materialData = selectData(materialTable)
+        index = 0;
+        if len(data) > 0:
+            for menuItem in data:    
+                material = [ item for item in materialData if (item['menuitemid'] == menuItem['id']) ]
+                matDel = copy.deepcopy(material)
+                
+                for d in matDel:
+                    del d['id'];
+                    del d['menuitemid']
+                    print(d)
+                data[index]['materialUsed'] = matDel;
+                index = index + 1
+            
+            return jsonify({'success':True , 'data':data })    
+        return jsonify({'success':True , 'data':[] })  
     
-@app.route('/getmenudata', methods=['GET', 'POST'])
-def getmenudata():
     if request.method == 'POST':
-        menuRequest = json.loads(request.data);
-        menuData = pd.read_csv(menuRequest['filename']+"_menu.csv");
-        menuData = menuData.to_json(orient='records')
-        return jsonify({'success':True , 'data' : menuData})
-    else:
-        return jsonify({'success':False})
-    
-@app.route('/setmenudata', methods=['GET', 'POST'])
-def setmenudata():
-    if request.method == 'POST':
-        menuData = json.loads(request.data);
-        menuItems = json.dumps(menuData['menuItems']);
-        allItems = pd.read_json(menuItems, orient='records')
-        os.remove(menuData['filename']+'_menu.csv')
-        allItems.to_csv(menuData['filename']+'_menu.csv', sep=',', encoding='utf-8' , index = False)
-        return jsonify({'success':True})    
-    else:
-        return jsonify({'success':False}) 
+        response = dict(json.loads(request.data))
+        materials = response['materialUsed']
+        del response['materialUsed']
         
+        allKeys  = tuple(response.keys())[1:]       
+        allData = tuple(response.values())[1:]
+        data = insertData(table ,allKeys, allData)
+        
+        keys = list(materials[0].keys()) 
+        keys.append('menuitemid')
+
+        allvalues = "";
+        for item in materials:
+            values = list(item.values())
+            values.append(data)
+            allvalues = allvalues +","+str(tuple(values))
+
+        insertData(materialTable ,tuple(keys), allvalues.strip(',')) 
+        return jsonify({'success':True , 'data' : data })
+            
+    if request.method == 'PUT':
+        
+        response = dict(json.loads(request.data))
+        materials = response['materialUsed']
+        del response['materialUsed']
+        
+        allKeys  = tuple(response.keys()) 
+        allData = tuple(response.values())
+        data = updateData(table ,allKeys, allData) 
+        keys = list(materials[0].keys()) 
+        keys.append('menuitemid')
+        deleteData(materialTable,'menuitemid',response['id'])
+
+        newValues = "";
+        for item in materials:
+            values = list(item.values())
+            values.append(response['id'])
+            newValues = newValues +","+str(tuple(values))
+
+        insertData(materialTable ,tuple(keys), newValues.strip(','))
+        return jsonify({'success':True , 'data' : "success" })
+    
+    if request.method == 'DELETE':
+        recordId = request.headers['recordId'];
+        deleteData(table,'id',recordId)
+        deleteData(materialTable,'menuitemid',recordId)
+
+        return jsonify({'success':True , 'data' : 'success' })
     
 @app.route('/saveOrder', methods=['GET', 'POST'])
 def submitOrder():
@@ -415,21 +466,7 @@ def setTableCount():
     else:
         return jsonify({'success':False})
          
-    
-    
-    
 
-    
-        
-
-    
-    
-    
-    
-    
-    
-    
-    
 
 def main():
     app.run();

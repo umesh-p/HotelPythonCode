@@ -1,4 +1,15 @@
-create table loginData (id integer primary key , name text , password varchar , nickname text , role text , zomatoid number , tablecount number);
+create table loginData (id integer primary key, name text, password varchar, nickname text , role text , zomatoid number , tablecount number);
+
 insert into loginData (name, password, nickname,role , zomatoid ,tablecount ) values("admin" , "admin" , "admin", "admin" , 18647056 , 20);
 insert into loginData (name, password, nickname,role , zomatoid, tablecount) values("chaskaAdda" , "chaskaAdda" , "chaskaAdda", "Manager" , 18647056,20);
-create table chaskaAddaStocks (id integer primary key , itemname text , qtyPresent real , minQty real , maxQty real, orderedQty real, unit text);
+
+create table chaskaAddaStocks (id integer primary key, itemname text, qtyPresent real, minQty real , maxQty real, orderedQty real, perunitprice integer, unit text);
+create table chaskaAddaMenu (id integer primary key, name text, sellingprice real, costprice real , availableat integer, platesperday real , isfavourite integer , isdisabled integer);
+create table chaskaAddaMenuMaterial (id integer primary key , menuitemid integer , materialname text , qtyused real , unit text ) ;
+
+create table adminStocks (id integer primary key, itemname text, qtyPresent real, minQty real , maxQty real, orderedQty real, perunitprice integer , unit text);
+create table adminMenu (id integer primary key, name text, sellingprice real, costprice real , availableat integer, platesperday real , isfavourite integer , isdisabled integer);
+create table adminMenuMaterial (id integer primary key , menuitemid integer , materialname text , qtyused real , unit text ) ;
+
+
+

@@ -4,12 +4,23 @@ insert into loginData (name, password, nickname,role , zomatoid ,tablecount ) va
 insert into loginData (name, password, nickname,role , zomatoid, tablecount) values("chaskaAdda" , "chaskaAdda" , "chaskaAdda", "Manager" , 18647056,20);
 
 create table chaskaAddaStocks (id integer primary key, itemname text, qtyPresent real, minQty real , maxQty real, orderedQty real, perunitprice integer, unit text);
-create table chaskaAddaMenu (id integer primary key, name text, sellingprice real, costprice real , availableat integer, platesperday real , isfavourite integer , isdisabled integer);
+create table chaskaAddaMenu (id integer primary key, name text, sellingprice real, costprice real , availableat integer, platesperday real , isfavourite integer , isdisabled integer , category text);
+
 create table chaskaAddaMenuMaterial (id integer primary key , menuitemid integer , materialname text , qtyused real , unit text ) ;
 
 create table adminStocks (id integer primary key, itemname text, qtyPresent real, minQty real , maxQty real, orderedQty real, perunitprice integer , unit text);
-create table adminMenu (id integer primary key, name text, sellingprice real, costprice real , availableat integer, platesperday real , isfavourite integer , isdisabled integer);
+create table adminMenu (id integer primary key, name text, sellingprice real, costprice real , availableat integer, platesperday real , isfavourite integer , isdisabled integer , category text);
 create table adminMenuMaterial (id integer primary key , menuitemid integer , materialname text , qtyused real , unit text ) ;
 
+
+
+create table adminOrders (id integer primary key,customername text,day integer , month integer , year integer , hour integer , totalbillamt real , totaltime integer, paymentmethod text , ordermethod text , waitingtime text);
+create table adminOrderItems (id integer primary key , orderid integer , name text , totalcost integer , totalprice integer, orderedqty integer , category text);
+
+create table chaskaAddaOrders (id integer primary key,customername text,day integer , month integer , year integer , hour integer , totalbillamt real , totaltime integer, paymentmethod text , ordermethod text , waitingtime text);
+create table chaskaAddaOrderItems (id integer primary key , orderid integer , name text , totalcost integer , totalprice integer, orderedqty integer , category text);
+
+create table chaskaAddaDailyPlates (id integer primary key , day integer , month integer , year integer , name text , noofplates integer); 
+create table adminDailyPlates (id integer primary key , day integer , month integer , year integer , name text , noofplates integer); 
 
 

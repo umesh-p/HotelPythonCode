@@ -9,6 +9,7 @@ import json
 from pandas.io.json import json_normalize
 from datetime import datetime
 from datetime import timedelta
+from datetime import date
 import requests
 import sqlite3
 import copy
@@ -63,6 +64,18 @@ def deleteData(tableName, param ,id):
     return 'success'
    
 
+def createTablesNewUser(username):
+    
+    conn.execute('create table {} (id integer primary key, itemname text, qtyPresent real, minQty real , maxQty real, orderedQty real, perunitprice integer, unit text)'.format(username+'Stocks'))
+    conn.execute('create table {} (id integer primary key, name text, sellingprice real, costprice real , availableat integer, platesperday real , isfavourite integer , isdisabled integer , category text)'.format(username+'Menu'))
+    conn.execute('create table {} (id integer primary key , menuitemid integer , materialname text , qtyused real , unit text )'.format(username+'MenuMaterial'))
+    conn.execute('create table {} (id integer primary key,customername text,day integer,date integer, month integer , year integer , hour integer , totalbillamt real , totaltime integer, paymentmethod text , ordermethod text , waitingtime text)'.format(username+'Orders'))
+    conn.execute('create table {} (id integer primary key , orderid integer , name text , totalcost integer , totalprice integer, orderedqty integer , category text)'.format(username+'OrderItems'))
+    conn.execute('create table {} (id integer primary key , dayDate text , name text , noofplates integer)'.format(username+'DailyPlates'))
+
+    conn.commit();
+    return 'success'
+    
 #========================================================================================================    
    
 @app.route('/login', methods=['GET', 'POST' , 'PUT' , 'DELETE'])
@@ -90,7 +103,31 @@ def login():
         conn.execute(updateTableCount)    
         conn.commit();
         return jsonify({'success':True , 'data' : '' })
+  
+#========================================================================================================
+
+  
+@app.route('/register', methods=['GET', 'POST' , 'PUT' , 'DELETE'])
+def registerUser():
+    loginResponse = json.loads(request.data)
         
+    if request.method == 'POST':
+        userData = c.execute('select role from loginData where name = ? and password = ? ' , (loginResponse['adminname'] ,loginResponse['adminpassword'])).fetchall();
+        print(userData[0][0])
+        if(len(userData) > 0 and userData[0][0] == 'admin'):
+            
+            response = dict(loginResponse)
+            del response['adminname'];
+            del response['adminpassword'];            
+            allKeys  = tuple(response.keys())       
+            allData = tuple(response.values())
+            data = insertData('loginData' ,allKeys, allData) 
+            createTablesNewUser(loginResponse['name'])
+            return jsonify({'success':True , 'data' : "User Registered Successfully ... " })
+            
+        else:
+            return jsonify({'success':False ,'data':'' ,'message':'Please enter valid Admin Credentials.'}) 
+              
 #========================================================================================================    
  
     
@@ -299,7 +336,6 @@ def dashboardData():
     if request.method == 'GET':
         
         orderData = pd.read_sql_query("SELECT * FROM "+table+"", conn)
-        orderItemData = pd.read_sql_query("SELECT * FROM "+orderedItemsTable+"", conn)
         
         responseObj['totalOrders'] = len(orderData)
         responseObj['tableOrderCount'] = len(orderData[orderData['ordermethod'] == 'tableorder'])
@@ -342,7 +378,6 @@ def dailyPlates():
     
     if request.method == 'GET':
         today = str(datetime.now().date());
-        print('SELECT * from '+table+' where dayDate = '+today)
         cursor = conn.execute('SELECT * from '+table+' where dayDate = "'+today+'"')
         dataRows = cursor.fetchall();
         columns = [d[0] for d in cursor.description]
@@ -361,83 +396,76 @@ def dailyPlates():
 
 @app.route('/getAnalysis', methods=['GET', 'POST'])
 def getAnalysis():
-    if request.method == 'POST':
         
-        orderData = json.loads(request.data);
-        allOrderData = pd.read_csv(orderData['filename']+"_orders.csv")
-        menu = pd.read_csv(orderData['filename']+"_menu.csv")
+    userName = request.headers['userName']
+    table = userName+'Orders'
+    orderedItemsTable = userName+'OrderItems'
+    
+    if request.method == 'GET':        
+
+        analysisData = {};
+        #analysis related to complete data..
+        orderData = pd.read_sql_query("SELECT * FROM "+table+"", conn)
+        orderedItemsTable = pd.read_sql_query("SELECT * FROM "+orderedItemsTable+"", conn)
         
-        groupedOrderData = allOrderData.groupby('name')['quantity'].sum().to_frame();
-        groupedOrderData = groupedOrderData.sort_values(['quantity'] , ascending=False)
+        analysisData['totalOrders'] = str(len(orderData))
+        analysisData['totalcost'] = str(sum(orderedItemsTable['totalcost']))
+        analysisData['totalSales'] = str(sum(orderData['totalbillamt']))
+
+        groupedOrderData = orderedItemsTable.groupby('name')['orderedqty'].sum().to_frame();
+        groupedOrderData = groupedOrderData.sort_values(['orderedqty'] , ascending=False)
         
         mostSoldItems = list(groupedOrderData.head(5).index.values)
-        mostSoldItemsCount = list(groupedOrderData.head(5)['quantity'].values)
+        mostSoldItemsCount = list(groupedOrderData.head(5)['orderedqty'].values)
         leastSoldItems = list(groupedOrderData.tail(5).index.values)
-        leastSoldItemsCount = list(groupedOrderData.tail(5)['quantity'].values)
-        
-        costPrices = []
-        sellingPrices = []
-        
-        for i in list(groupedOrderData.index.values): 
-            costPrices.append(int(menu[menu['name'] == i]['cost']))
-        
-        for i in list(groupedOrderData.index.values): 
-            sellingPrices.append(int(menu[menu['name'] == i]['price']))
-         
-        groupedOrderData['costPrice'] = costPrices
-        groupedOrderData['sellingPrice'] = sellingPrices 
-        
-        groupedOrderData['costPrice'] = groupedOrderData['costPrice'] * groupedOrderData['quantity']
-        groupedOrderData['sellingPrice'] = groupedOrderData['sellingPrice'] * groupedOrderData['quantity']
-        groupedOrderData['profitEarned'] = groupedOrderData['sellingPrice'] - groupedOrderData['costPrice']
-        
-        itemNames = list(groupedOrderData.index.values)
-        quantitySold = list(groupedOrderData['quantity'].values)
-        costPrice = list(groupedOrderData['costPrice'].values)
-        sellingPrice = list(groupedOrderData['sellingPrice'].values)
-        profitEarned = list(groupedOrderData['profitEarned'].values)
-
-        totalSale = str(groupedOrderData['sellingPrice'].sum());
-        totalExpenditure = str(groupedOrderData['costPrice'].sum());
-        
-             
-        orderHours = list(allOrderData['orderHour'].unique())        
-        orderHours.sort()        
-        orderCountHour = []
-        
-        for i in list(allOrderData['orderHour'].unique()):
-            orderCountHour.append(len(allOrderData[allOrderData['orderHour'] == i]['ordernumber'].unique()))
-             
-        date_format = "%m/%d/%Y"
-        a = datetime.strptime(allOrderData.iloc[0]['date'], date_format)
-        b = datetime.strptime(allOrderData.iloc[-1]['date'], date_format)
-        totalDays = b - a
-        totalDays = int(totalDays.days) + 1;
-        
-        analysisData = dict()
-        
-        analysisData['totalSales'] = (totalSale)
-        analysisData['totalExpenditures'] = (totalExpenditure)
+        leastSoldItemsCount = list(groupedOrderData.tail(5)['orderedqty'].values)
+          
         
         analysisData['mostSoldItems'] = [str(i) for i in mostSoldItems]
         analysisData['mostSoldItemsCount'] = [str(i) for i in mostSoldItemsCount]
         analysisData['leastSoldItems'] = [str(i) for i in leastSoldItems]
         analysisData['leastSoldItemsCount'] = [str(i) for i in leastSoldItemsCount]
-        analysisData['itemNames'] = [str(i) for i in itemNames]; 
-        analysisData['quantitySold'] = [str(i) for i in quantitySold]
-        analysisData['costPrice'] = [str(i) for i in costPrice]
-        analysisData['sellingPrice'] = [str(i) for i in sellingPrice]
-        analysisData['profitEarned'] = [str(i) for i in profitEarned]
+        
+        
+        categoryOrderData = orderedItemsTable.groupby('category')['orderedqty'].sum().to_frame();
+        categoryOrderData = categoryOrderData.sort_values(['orderedqty'] , ascending=False)
+        
+        analysisData['categoryArray'] = [str(i) for i in list(categoryOrderData.index.values)]
+        analysisData['soldCount'] = [str(i) for i in list(categoryOrderData['orderedqty'].values)]
+        
+        orderHours = list(orderData['hour'].unique())        
+        orderHours.sort()        
+        orderCountHour = []
+        
+        for i in list(orderData['hour'].unique()):
+            orderCountHour.append(len(orderData[orderData['hour'] == i]['id'].unique()))
+          
         analysisData['orderHour'] = [str(i)+":00 PM" if (i > 12) else str(i)+ ":00 AM" for i in orderHours];
         analysisData['orderCountHour'] = [str(i) for i in orderCountHour]
-        analysisData['totalDays'] = str(totalDays)
+        
+        #Avg Data analysis ..
+        
+        d0 = date(int(orderData[:1].year), int(orderData[:1].month) , int(orderData[:1].date))
+        d1 = date(int(orderData.tail(1).year) , int(orderData.tail(1).month) , int(orderData.tail(1).date))
+        
+        totalDays = d1-d0;
+        
+        if(d0 == d1 ):
+            totalDays = 1;
+        else:
+            totalDays = int(totalDays.days)
         
         
+        analysisData['totalBusinessDays']=str(totalDays)
+        
+        analysisData['avgTimePerOrder'] = str(sum(orderData['totaltime'])/len(orderData))
+        analysisData['avgSalesPerDay'] = str(sum(orderData['totalbillamt']) / totalDays)
+        analysisData['avgOrdersPerDay'] = str(len(orderData) / totalDays)
+                
         return jsonify({'success':True , 'data':json.dumps(analysisData)})
     
     else:
         return jsonify({'success':False})
-
 
 
 def main():
